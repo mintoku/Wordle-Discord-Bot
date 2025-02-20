@@ -72,7 +72,6 @@ async def on_ready():
     #client.loop.create_task(daily_leaderboard())  # Start the daily leaderboard task
 
 
-
 @client.event
 async def on_message(message):
     global active_channels
