@@ -60,6 +60,7 @@ def sort_messages_by_score(filename):
 
 # checks if this is a wordle report
 def check_format(message):
+    #if "Wordle " in message and ("⬛" in message or "🟨" in message or "🟩" in message) and len(message) > 13:
     if "Wordle " in message and message[8] == "," and message[7].isdigit() and message[13].isdigit() and len(message) > 13:
         return True
     else:
