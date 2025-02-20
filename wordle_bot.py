@@ -2,13 +2,13 @@
 import os
 import json
 import discord
+import re
 from discord.ext import commands
 from dotenv import load_dotenv
 
 import asyncio
 import time
 from datetime import datetime
-
 
 JSON_FILE = "data.json"
 
@@ -58,19 +58,28 @@ def sort_messages_by_score(filename):
 #     with open(JSON_FILE, "w") as f:
 #         json.dump(messages, f, indent=4)
 
-# checks if this is a wordle report
+# Checks if this is a wordle report and accounts for users typing other things 
+# before or after the wordle report appears
+# Redundant code for now but I need to write it like this unless the code below 
+# for evalutaing a score is changed
 def check_format(message):
-    #if "Wordle " in message and ("⬛" in message or "🟨" in message or "🟩" in message) and len(message) > 13:
-    if "Wordle " in message and message[8] == "," and message[7].isdigit() and message[13].isdigit() and len(message) > 13:
+    regex = "^Wordle \d{1,3}(,\d{3})? [1-6]/6$"
+    match = re.search(regex, message)
+    if match is not None:
         return True
-    else:
-        return False
+    return False
 
+def find_score(message):
+    regex = "^Wordle \d{1,3}(,\d{3})? [1-6]/6$"
+    match = re.search(regex, message)
+    if match is not None:
+        return match.group()[13]
+        
 @client.event
 async def on_ready():
     print(f'{client.user} has connected to Discord!')
     #client.loop.create_task(daily_leaderboard())  # Start the daily leaderboard task
-
+    #client.loop.create_task(all_time_leaderboard()) # Start the all-time leaderboard task
 
 @client.event
 async def on_message(message):
@@ -111,9 +120,7 @@ async def on_message(message):
         # with open(filename, "w") as f:
         #     json.dump(messages, f, indent=4)
 
-
     if message.content.startswith("!leaderboard"):
-       
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)  # Midnight UTC
 
         messages = []
@@ -124,7 +131,7 @@ async def on_message(message):
                 messages.append({
                     "author": current_message.author.name,
                     "author_id": current_message.author.id,
-                    "score": current_message.content[13],
+                    "score": find_score(current_message.content),
                     "timestamp": str(current_message.created_at)
                 })
         # Save messages to a JSON file for the channel
@@ -135,10 +142,8 @@ async def on_message(message):
             print(f"Saved {len(messages)} messages from today.")
         else:
             await message.channel.send("No messages from today to save.")
-
         if messages:
             sorted_messages = sort_messages_by_score(filename)
-
             count = 0
             previous_score = 0
             await message.channel.send("**Here's how everyone did today:**")
@@ -154,7 +159,6 @@ async def on_message(message):
                         emoji = "🥉"
                     else:
                         emoji = "🏅"
-                    
                     await message.channel.send(f"{emoji}  {current_message['author']}'s score - {current_message['score']}")
                     previous_score = current_message['score']
                 else:
