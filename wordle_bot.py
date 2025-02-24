@@ -8,13 +8,15 @@ from dotenv import load_dotenv
 
 import asyncio
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 JSON_FILE = "data.json"
 
 # Load environment variables
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
+
+TARGET_CHANNEL_ID = -1 #Fix Later
 
 # Enable intents (default + message handling)
 intents = discord.Intents.default()
@@ -82,6 +84,69 @@ async def on_ready():
     #client.loop.create_task(all_time_leaderboard()) # Start the all-time leaderboard task
 
 @client.event
+async def scan_channel_daily():
+    messages = []
+    filename = ""
+    await client.wait_until_ready()
+    while not client.is_closed():
+        now = datetime.now()
+        target_time = now.replace(hour=23, minute=59, second=59, microsecond=0)
+        if now >= target_time:
+            target_time += timedelta(days=1)
+
+        sleep_duration = (target_time - now).total_seconds()
+        await asyncio.sleep(sleep_duration)
+
+        today = datetime.now().date()
+        filename = f"stats" + str(today) + ".json"
+        channel = client.get_channel(TARGET_CHANNEL_ID)
+
+        if channel:
+            recent_message = await channel.history(limit=1).flatten()
+            if recent_message:
+                message = recent_message[0]
+                if message.created_at.date() == today:
+                    async for current_message in message.channel.history(after=today):
+                        if current_message.created_at.date() == message.created_at.date() and check_format(current_message.content):  # Check if the message is from today
+                            messages.append({
+                                "author": current_message.author.name,
+                                "author_id": current_message.author.id,
+                                "score": find_score(current_message.content),
+                                "timestamp": str(current_message.created_at)
+                            })
+        if messages:
+            with open(filename, "w") as f:
+                json.dump(messages, f, indent=4)
+            print(f"Saved {len(messages)} messages from today.")
+        else:
+            await message.channel.send("No messages from today to save.")
+        if messages:
+            sorted_messages = sort_messages_by_score(filename)
+            count = 0
+            previous_score = 0
+            await message.channel.send("**Here's how everyone did today:**")
+            for current_message in sorted_messages:
+                if not current_message['score'] == previous_score:
+                    count += 1
+                    await message.channel.send("--------------------")
+                    if count == 1:
+                        emoji = "🥇"
+                    elif count == 2:
+                        emoji = "🥈"
+                    elif count == 3:
+                        emoji = "🥉"
+                    else:
+                        emoji = "🏅"
+                    await message.channel.send(f"{emoji}  {current_message['author']}'s score - {current_message['score']}")
+                    previous_score = current_message['score']
+                else:
+                    await message.channel.send(f"{emoji}  {current_message['author']}'s score - {current_message['score']}")
+                    previous_score = current_message['score']
+        #Add Logic for Adding to Month
+
+#Note: Refactor for !leaderboard (day) or other variations such as !leaderboard (week)
+#Decide between the winner for the week/month being average placement or average guesses
+@client.event
 async def on_message(message):
     global active_channels
 
@@ -138,7 +203,6 @@ async def on_message(message):
         if messages:
             with open(filename, "w") as f:
                 json.dump(messages, f, indent=4)
-
             print(f"Saved {len(messages)} messages from today.")
         else:
             await message.channel.send("No messages from today to save.")
@@ -149,7 +213,7 @@ async def on_message(message):
             await message.channel.send("**Here's how everyone did today:**")
             for current_message in sorted_messages:
                 if not current_message['score'] == previous_score:
-                    count+=1
+                    count += 1
                     await message.channel.send("--------------------")
                     if count == 1:
                         emoji = "🥇"
@@ -164,8 +228,6 @@ async def on_message(message):
                 else:
                     await message.channel.send(f"{emoji}  {current_message['author']}'s score - {current_message['score']}")
                     previous_score = current_message['score']
-
-            
         if os.path.exists(filename):
             os.remove(filename)
             print(f"File '{filename}' deleted successfully.")
