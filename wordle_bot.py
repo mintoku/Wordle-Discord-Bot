@@ -216,7 +216,7 @@ async def leaderboard(ctx, time_frame: str = None):
     if "week" in time_frame.lower():
         match = re.search(r"week\s*(\d+)", time_frame.lower())
         if not match:
-            await channel.send("Invalid week format. Please use `week <number>`.")
+            await channel.send("Invalid week format. Please use `week<number>`.")
             return
 
         week_number = int(match.group(1))
