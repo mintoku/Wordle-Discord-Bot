@@ -217,6 +217,7 @@ async def manual_insert(ctx, score: int, date: str, player: str):
     else:
         if date in history.columns:
             history.at[player, date] = score
+            save_data(history, HISTORY_PATH.split('.')[0])
         else:
             await ctx.send(f"Invalid Date {date}")
             return
